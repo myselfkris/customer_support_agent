@@ -36,10 +36,21 @@ import argparse
 import datetime
 from urllib.parse import urlparse, parse_qs
 
+# Load local .env file if present
+_env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+if os.path.exists(_env_path):
+    with open(_env_path, 'r', encoding='utf-8') as _f:
+        for _line in _f:
+            _line = _line.strip()
+            if _line and not _line.startswith('#') and '=' in _line:
+                _key, _val = _line.split('=', 1)
+                os.environ[_key.strip()] = _val.strip().strip('\'"')
+
 # ─────────────────────────────────────────────────────────────
 # CONFIGURATION — fill in your API key here OR use env variable
 # ─────────────────────────────────────────────────────────────
 API_KEY = os.environ.get("YOUTUBE_API_KEY", "YOUR_API_KEY_HERE")
+
 
 # The exact CSV columns matching raw_comments.csv schema
 CSV_COLUMNS = [
@@ -166,7 +177,7 @@ def fetch_all_comment_threads(youtube, video_id: str) -> list[dict]:
     page_token = None
     page_num = 1
 
-    print(f"\n📡 Fetching comments for video: {video_id}")
+    print(f"\n[INFO] Fetching comments for video: {video_id}")
 
     while True:
         print(f"   Page {page_num}... ", end="", flush=True)
@@ -311,7 +322,7 @@ def save_to_csv(rows: list[dict], output_path: str):
         writer.writeheader()
         writer.writerows(rows)
 
-    print(f"\n✅ Saved {len(rows)} rows to: {output_path}")
+    print(f"\n[SUCCESS] Saved {len(rows)} rows to: {output_path}")
 
 
 # ─────────────────────────────────────────────────────────────
@@ -362,19 +373,19 @@ def main():
     base_dir   = os.path.dirname(os.path.abspath(__file__))
     output_path = os.path.join(base_dir, args.output)
 
-    print(f"🎬 Video ID : {video_id}")
-    print(f"📄 Output   : {output_path}")
+    print(f"Video ID : {video_id}")
+    print(f"Output   : {output_path}")
 
     # Run the extraction
     youtube = build_youtube_client()
     rows    = fetch_all_comment_threads(youtube, video_id)
 
-    print(f"\n📊 Total rows collected: {len(rows)}")
+    print(f"\nTotal rows collected: {len(rows)}")
     print(f"   - Root comments : {sum(1 for r in rows if r['parent_id'] == 'root')}")
     print(f"   - Replies       : {sum(1 for r in rows if r['parent_id'] != 'root')}")
 
     save_to_csv(rows, output_path)
-    print("\n🚀 Done! Run main.py next to analyze the comments with the LLM.")
+    print("\nDone! Run main.py next to analyze the comments with the LLM.")
 
 
 if __name__ == "__main__":
