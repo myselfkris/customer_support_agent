@@ -1,6 +1,10 @@
 # Sensitive environment keys
 .env
 
+# Google Service Account credentials (NEVER commit this!)
+credentials.json
+*service_account*.json
+
 # Python compilation and environments
 __pycache__/
 *.py[cod]
