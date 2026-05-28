@@ -6,9 +6,9 @@ YouTube Reply Identifier Agent
 Pipeline:
   1. Load raw_comments.csv
   2. Load system prompt from prompt.txt
-  3. Send ALL comments in ONE single API call to Gemini
-  4. Parse the returned JSON array
-  5. Save structured results to analyzed_comments.csv
+  3. Send comments in BATCHES to Gemini (default: 10 per batch)
+  4. Parse the returned JSON arrays from each batch
+  5. Merge all batch results and save to analyzed_comments.csv
 
 Usage:
   python main.py
@@ -21,6 +21,7 @@ import os
 import csv
 import json
 import re
+import time
 
 # ─────────────────────────────────────────────────────────────
 # Load local .env file if present
@@ -38,7 +39,10 @@ if os.path.exists(_env_path):
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-MODEL_NAME     = "gemini-2.5-flash"   # 1 call for all comments = no quota issues
+MODEL_NAME     = "gemini-2.5-flash"
+
+# Batching config — how many comments to send per API call
+BATCH_SIZE = 10   # Safe for output tokens; each batch produces ~1,600 output tokens
 
 # Output CSV columns (locked schema)
 OUTPUT_COLUMNS = [
@@ -79,7 +83,7 @@ def load_prompt(prompt_path: str) -> str:
 
 def build_batch_message(comments: list[dict]) -> str:
     """
-    Formats all comments into a single user message.
+    Formats a batch of comments into a single user message.
     Each comment is clearly numbered and labeled so the model
     can process them all at once and return an ordered JSON array.
     """
@@ -137,7 +141,7 @@ def parse_json_response(raw_text: str) -> list[dict] | None:
 
 def call_gemini_batch(client, system_prompt: str, user_message: str) -> tuple[str, str]:
     """
-    Sends a single batch request to the Gemini API for all comments.
+    Sends a single batch request to the Gemini API.
     Returns (raw_text, finish_reason).
     """
     from google.genai import types
@@ -148,7 +152,7 @@ def call_gemini_batch(client, system_prompt: str, user_message: str) -> tuple[st
         config=types.GenerateContentConfig(
             system_instruction=system_prompt,
             temperature=0.2,
-            max_output_tokens=16384,  # enough for 52 detailed comment analyses
+            max_output_tokens=4096,  # Enough for ~10 comments per batch
             thinking_config=types.ThinkingConfig(
                 thinking_budget=0,    # disable thinking tokens — they eat output budget
             ),
@@ -218,49 +222,85 @@ def main():
         print("[ERROR] Missing library. Run:  pip install google-genai")
         return
 
-    # --- Build the single batch message ---
-    print(f"\n[3/4] Sending all {len(comments)} comments in ONE API call to {MODEL_NAME}...")
-    user_message = build_batch_message(comments)
+    # --- Split comments into batches ---
+    total = len(comments)
+    num_batches = (total + BATCH_SIZE - 1) // BATCH_SIZE  # ceiling division
+    print(f"\n[3/4] Processing {total} comments in {num_batches} batches (batch size = {BATCH_SIZE})...")
 
-    try:
-        raw_response, finish_reason = call_gemini_batch(client, system_prompt, user_message)
-        print(f"      Response received ({len(raw_response)} chars, finish_reason={finish_reason}).")
-        if "MAX_TOKENS" in finish_reason or "LENGTH" in finish_reason:
-            print("[WARNING] Response was cut off by token limit! Partial results may be saved.")
-    except Exception as e:
-        print(f"[ERROR] API call failed: {e}")
+    all_results = []
+    failed_batches = []
+
+    for batch_num in range(num_batches):
+        start_idx = batch_num * BATCH_SIZE
+        end_idx   = min(start_idx + BATCH_SIZE, total)
+        batch     = comments[start_idx:end_idx]
+
+        print(f"\n   -- Batch {batch_num + 1}/{num_batches} (comments {start_idx + 1}-{end_idx}) --")
+
+        user_message = build_batch_message(batch)
+
+        try:
+            raw_response, finish_reason = call_gemini_batch(client, system_prompt, user_message)
+            print(f"      Response: {len(raw_response)} chars, finish_reason={finish_reason}")
+
+            if "MAX_TOKENS" in finish_reason or "LENGTH" in finish_reason:
+                print(f"      [WARNING] Batch {batch_num + 1} was truncated by token limit!")
+                failed_batches.append(batch_num + 1)
+
+            # Parse this batch's response
+            batch_results = parse_json_response(raw_response)
+
+            if batch_results:
+                print(f"      Parsed {len(batch_results)} analyses.")
+                all_results.extend(batch_results)
+            else:
+                print(f"      [ERROR] Failed to parse batch {batch_num + 1}. Skipping.")
+                failed_batches.append(batch_num + 1)
+
+                # Save the raw response for debugging
+                debug_file = os.path.join(base_dir, f'raw_response_debug_batch{batch_num + 1}.txt')
+                with open(debug_file, 'w', encoding='utf-8') as f:
+                    f.write(raw_response)
+                print(f"      Raw response saved to: {debug_file}")
+
+        except Exception as e:
+            print(f"      [ERROR] API call failed for batch {batch_num + 1}: {e}")
+            failed_batches.append(batch_num + 1)
+
+        # Small delay between batches to respect rate limits (free tier: 15 RPM)
+        if batch_num < num_batches - 1:
+            print("      Waiting 4s before next batch (rate limit safety)...")
+            time.sleep(4)
+
+    # --- Parse and save results ---
+    print(f"\n[4/4] Merging results from all batches...")
+
+    if not all_results:
+        print("[ERROR] No results from any batch. Check API key and connectivity.")
         return
 
-    # --- Parse response ---
-    print("\n[4/4] Parsing JSON response...")
-    results = parse_json_response(raw_response)
-
-    if not results:
-        print("[ERROR] Could not parse JSON from model response.")
-        print("Raw response saved to: raw_response_debug.txt")
-        with open(os.path.join(base_dir, 'raw_response_debug.txt'), 'w', encoding='utf-8') as f:
-            f.write(raw_response)
-        return
-
-    print(f"      Parsed {len(results)} comment analyses.")
+    print(f"      Total parsed: {len(all_results)} comment analyses.")
 
     # Ensure all required keys are present in every row
-    for row in results:
+    for row in all_results:
         for col in OUTPUT_COLUMNS:
             row.setdefault(col, "")
 
     # --- Save results ---
-    save_results(results, output_path)
+    save_results(all_results, output_path)
 
     # --- Summary table ---
     print("\n" + "=" * 55)
-    high   = sum(1 for r in results if r.get('urgency') == 'High')
-    medium = sum(1 for r in results if r.get('urgency') == 'Medium')
-    low    = sum(1 for r in results if r.get('urgency') == 'Low')
-    print(f"  Total analyzed : {len(results)}")
+    high   = sum(1 for r in all_results if r.get('urgency') == 'High')
+    medium = sum(1 for r in all_results if r.get('urgency') == 'Medium')
+    low    = sum(1 for r in all_results if r.get('urgency') == 'Low')
+    print(f"  Total analyzed : {len(all_results)}")
     print(f"  High urgency   : {high}")
     print(f"  Medium urgency : {medium}")
     print(f"  Low urgency    : {low}")
+    if failed_batches:
+        print(f"\n  WARNING Failed batches: {failed_batches}")
+        print(f"  Missing comments : ~{len(failed_batches) * BATCH_SIZE}")
     print(f"\n  Output file    : analyzed_comments.csv")
     print("=" * 55)
 
