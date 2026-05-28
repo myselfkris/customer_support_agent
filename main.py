@@ -286,6 +286,10 @@ def main():
         for col in OUTPUT_COLUMNS:
             row.setdefault(col, "")
 
+    # Sort results by intent_level in decreasing order: High -> Medium -> Low -> None
+    intent_order = {"High": 0, "Medium": 1, "Low": 2, "None": 3}
+    all_results.sort(key=lambda r: intent_order.get(r.get("intent_level", ""), 4))
+
     # --- Save results ---
     save_results(all_results, output_path)
 
