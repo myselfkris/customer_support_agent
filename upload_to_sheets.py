@@ -113,6 +113,17 @@ def authenticate(credentials_path: str):
         'https://www.googleapis.com/auth/drive',
     ]
 
+    # 1. Try to load credentials from the environment variable (useful for cloud deployment)
+    raw_json = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON_RAW")
+    if raw_json:
+        try:
+            creds_info = json.loads(raw_json)
+            creds = Credentials.from_service_account_info(creds_info, scopes=scopes)
+            return gspread.authorize(creds)
+        except Exception as e:
+            print(f"[WARNING] Failed to authenticate using GOOGLE_SERVICE_ACCOUNT_JSON_RAW: {e}")
+
+    # 2. Fall back to reading the credentials.json file from the disk
     if not os.path.exists(credentials_path):
         raise FileNotFoundError(
             f"\n[ERROR] credentials.json not found at: {credentials_path}\n"

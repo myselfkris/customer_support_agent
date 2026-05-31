@@ -1,0 +1,16 @@
+# ─── YouTube Reply Agent — Web App Dependencies ───
+# Install: pip install -r requirements.txt
+
+# Backend server
+fastapi
+uvicorn[standard]
+
+# YouTube comment extraction
+google-api-python-client
+
+# Gemini AI analysis
+google-genai
+
+# Google Sheets upload
+gspread
+google-auth

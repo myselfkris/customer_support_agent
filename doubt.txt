@@ -1,0 +1,216 @@
+============================================================
+  DOUBTS & ANSWERS — YouTube Reply Agent Project
+  All questions asked across ALL conversations
+============================================================
+
+
+────────────────────────────────────────────────────────────
+  CONVERSATION 1 (22b71e47) — Project Architecture Learning
+────────────────────────────────────────────────────────────
+
+Q1: "Since you are the best architect, teach me — how is this project made 
+     up and what are used and why?"
+──────────────────────────────────────────────────────────────────────────
+The project has 4 files: raw_comments.csv (data layer), prompt.txt (AI brain 
+instructions), main.py (orchestrator/glue code), and README.md (docs + output 
+schema contract). Prompt is kept separate from code so you can change AI 
+behavior without touching Python.
+
+
+Q2: "How were raw_comments extracted from the video? Where is the code for 
+     that? Is it easy to get comments from the desired content creator and 
+     how is it stored in a proper structure?"
+──────────────────────────────────────────────────────────────────────────
+There was no extraction code initially — the CSV was manually obtained. We 
+built extract_comments.py using the YouTube Data API v3 (Google's official 
+free API). It handles pagination (max 100 comments/page), deep replies (>5 
+replies need a separate endpoint), and saves in the exact CSV schema.
+
+
+Q3: "Push to GitHub" (git init, commit, push to Comments_Analysis_Agent.git)
+──────────────────────────────────────────────────────────────────────────
+Action request — initialized git repo in youtube-reply-agent, committed 
+README.md, set branch to main, and pushed to GitHub. Then later added all 
+remaining files (extract_comments.py, main.py, prompt.txt, raw_comments.csv).
+
+
+────────────────────────────────────────────────────────────
+  CONVERSATION 2 (ab9517c4) — Prompt Engineering Skill
+────────────────────────────────────────────────────────────
+
+Q4: "Help me design a good prompt to extract issue type, error code, and 
+     priority from bug reports."
+──────────────────────────────────────────────────────────────────────────
+This was about the prompt-engineering skill, not directly the YouTube agent. 
+A structured prompt with clear field definitions, allowed values, and output 
+format examples produces consistent, parseable LLM output — same principles 
+we applied to prompt.txt in this project.
+
+
+Q5: "Check my skill — why and how is it useful, and when am I NOT supposed 
+     to use it?"
+──────────────────────────────────────────────────────────────────────────
+The prompt-engineering skill is useful when writing prompts for LLM 
+interactions, designing production templates, or optimizing outputs. Don't 
+use it for simple code edits, debugging, or non-LLM tasks — it adds overhead 
+without benefit in those cases.
+
+
+Q6: "I didn't get that. Do it with practice — with skill and without skill, 
+     a small one so I can understand the power of skill."
+──────────────────────────────────────────────────────────────────────────
+Skills are pre-loaded instruction sets that give the agent domain expertise. 
+Without a skill, the agent gives generic answers. With the skill, it follows 
+best practices (few-shot examples, chain-of-thought, output schemas) 
+automatically. The difference is visible in prompt quality.
+
+
+Q7: "What if the skill itself is not worthy to choose?"
+──────────────────────────────────────────────────────────────────────────
+If a skill doesn't match your task, skip it — using the wrong skill adds 
+noise. Evaluate by checking: does it cover my domain? Does it have examples 
+relevant to my use case? If no, proceed without it.
+
+
+────────────────────────────────────────────────────────────
+  CONVERSATION 3 (7e54e835) — Building the LLM Pipeline
+────────────────────────────────────────────────────────────
+
+Q8: "Write the exact prompt in prompt.txt. In main.py, read the CSV, send 
+     one comment at a time to the model, and save structured output to CSV."
+──────────────────────────────────────────────────────────────────────────
+Action request — wrote the system prompt with all 7 field definitions and 
+built main.py to loop through each comment, call Gemini API per comment, 
+parse the JSON response, and save to analyzed_comments.csv.
+
+
+Q9: "What happened? What's the problem? Explain me, find the best possible 
+     solution."
+──────────────────────────────────────────────────────────────────────────
+The script crashed with two errors: (1) Rate limit exceeded on gemini-2.0-
+flash free tier (429 RESOURCE_EXHAUSTED), and (2) UnicodeEncodeError on 
+Windows because ✓/✗ symbols aren't supported in cp1252 encoding. Fix: 
+switched model, added retry with backoff, replaced Unicode with ASCII.
+
+
+Q10: "Don't give deep answers. What files are required and what not? Tell 
+      the answer in a single line for every file."
+──────────────────────────────────────────────────────────────────────────
+The essential files are: main.py (required — runs the agent), prompt.txt 
+(required — AI instructions), raw_comments.csv (required — input data), 
+extract_comments.py (required — fetches comments), .env (required — API 
+keys), .gitignore (required — protects secrets), README.md (optional — docs).
+
+
+Q11: "I don't need list_models and raw_response — am I correct?"
+──────────────────────────────────────────────────────────────────────────
+Yes, correct. list_models.py was a debug utility to check available Gemini 
+models. raw_response_debug.txt was a temporary debug file for failed parses. 
+Both are safe to delete — they're not part of the production pipeline.
+
+
+Q12: "Since you are master in how to use tokens and when to use — take a 
+      master class on this topic. And why did you disable thinking? The 
+      output I got is worst. What might be the reasons — because of the 
+      poor prompt or because of the model?"
+──────────────────────────────────────────────────────────────────────────
+Thinking was disabled (thinking_budget=0) to save output tokens — thinking 
+tokens consume from the same budget. Poor output is likely caused by BOTH: 
+the prompt needed to be more specific for the target channel's context, AND 
+sending 63 comments at once can overwhelm the model's output capacity.
+
+
+Q13: "What is the difference between sending the API call per row vs 
+      everything at once?"
+──────────────────────────────────────────────────────────────────────────
+Per-row: more API calls but each is small, reliable, and easy to retry. All-
+at-once: fewer calls but risks token limit truncation and broken JSON. The 
+sweet spot is batching (groups of 10-15), which balances cost and reliability.
+
+
+Q14: "With my problem statement I hit the wall of token computation. What 
+      knowledge should I have to overcome this? Or is there any free 
+      platform providing APIs?"
+──────────────────────────────────────────────────────────────────────────
+Key techniques: batching (split into groups), prompt compression (remove 
+filler), output optimization (don't echo back known data). Free platforms: 
+Google Gemini free tier (best), Groq, OpenRouter, HuggingFace, Ollama 
+(local/free forever).
+
+
+Q15: "I am not looking for generic answers. Find the knowledge to use LLM 
+      in best possible way, any engineering principles to reduce token cost. 
+      If you are a senior LLM system designer you won't just change the API 
+      key — you may solve this by applying something. What is that?"
+──────────────────────────────────────────────────────────────────────────
+The engineering principles are: (1) Batching — split work into optimal-sized 
+chunks, (2) Prompt compression — remove redundant instructions, (3) Output 
+schema optimization — return indices instead of echoing data, (4) Streaming — 
+capture partial results gracefully. These are real LLM system design 
+patterns, not workarounds.
+
+
+────────────────────────────────────────────────────────────
+  CONVERSATION 4 (d33452c9) — Current Chat
+────────────────────────────────────────────────────────────
+
+Q16: "Push all the updates to GitHub."
+──────────────────────────────────────────────────────────────────────────
+Action request — staged all changes (modified + new files), committed with 
+message about improving comment analysis agent, and pushed to GitHub remote 
+on the main branch.
+
+
+Q17: "With my problem statement I hit the wall of token computation. What 
+      knowledge should I have to overcome this or is there any free platform 
+      providing APIs?"
+──────────────────────────────────────────────────────────────────────────
+Same as Q14 — covered batching, prompt compression, output optimization, 
+streaming, and listed free platforms (Gemini, Groq, OpenRouter, HuggingFace, 
+Ollama, Together AI, Cerebras).
+
+
+Q18: "Why batching if I send all in one time it costs low tokens — then what 
+      is the point in sharing in batches?"
+──────────────────────────────────────────────────────────────────────────
+Batching costs slightly more INPUT tokens but the bottleneck is OUTPUT 
+tokens. 63 comments need ~9,000 output tokens that can get truncated. Smaller 
+batches guarantee each call's output fits safely under the limit.
+
+
+Q19: "Do the prompt compression but let me know what exactly you have 
+      changed."
+──────────────────────────────────────────────────────────────────────────
+Removed the 20-line JSON example block (~200 tokens), shortened intent 
+definitions from full sentences to keywords, removed filler words like 
+"expert", and merged redundant paragraphs. Total: ~67% reduction, same 
+functional behavior.
+
+
+Q20: "Do all the clear calculation and show me how tokens work. Teach me 
+      with a basic example and connect to my project."
+──────────────────────────────────────────────────────────────────────────
+A token ≈ 4 English characters or 3/4 of a word. Your project uses ~4,267 
+input tokens (prompt + 63 comments) and ~8,920 output tokens (JSON per 
+comment). Telugu text costs 2-3x more tokens than English. Full breakdown 
+in token_masterclass.md.
+
+
+Q21: "Output schema optimization — if we don't know commenter_name and 
+      comment_text then how can we figure whom we should reply?"
+──────────────────────────────────────────────────────────────────────────
+You never lose the data. The model returns an index number instead of echoing 
+back name/text. Python code merges them back from raw_comments.csv by index. 
+The final CSV looks identical — the merge is free (no API cost).
+
+
+Q22: "Streaming — what is this? I didn't understand."
+──────────────────────────────────────────────────────────────────────────
+Normal API: waits for the full response (all or nothing). Streaming: delivers 
+the response piece by piece as it's generated. If it stops mid-way, you still 
+have everything generated so far. Like a buffet vs delivery.
+
+
+============================================================
+  Total: 22 questions across 4 conversations
+============================================================
