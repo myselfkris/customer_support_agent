@@ -1,0 +1,96 @@
+ACME CORP — SHIPPING POLICY
+Version 1.4 | Effective Date: January 1, 2026
+
+===========================================================
+SECTION 1: STANDARD SHIPPING
+===========================================================
+
+Acme Corp offers the following standard shipping options for all domestic
+(United States) orders:
+
+Standard Shipping (5-7 business days): FREE on orders over $50. $4.99 for
+orders under $50.
+
+Expedited Shipping (2-3 business days): $12.99 flat rate for all orders.
+
+Overnight Shipping (next business day): $24.99 flat rate. Orders must be
+placed before 12:00 PM EST to qualify for next-day delivery. Orders placed
+after 12:00 PM EST will ship the following business day.
+
+===========================================================
+SECTION 2: ORDER PROCESSING TIME
+===========================================================
+
+All orders are processed within 1 to 2 business days of being placed.
+Orders placed on weekends or federal holidays will be processed on the
+next business day.
+
+Once your order is processed and shipped, you will receive a shipping
+confirmation email with a tracking number. Allow 24 hours for the tracking
+number to become active on the carrier's website.
+
+===========================================================
+SECTION 3: SHIPPING CARRIERS
+===========================================================
+
+Acme Corp ships via the following carriers depending on package size and
+destination:
+
+- UPS: Standard and expedited domestic orders
+- FedEx: Overnight and large item orders
+- USPS: Small packages and rural delivery areas
+
+You cannot select a specific carrier. Acme Corp reserves the right to
+choose the most efficient carrier for each shipment.
+
+===========================================================
+SECTION 4: INTERNATIONAL SHIPPING
+===========================================================
+
+Acme Corp ships to over 45 countries. International shipping rates and
+estimated delivery times vary by destination:
+
+Canada: 7-14 business days, starting at $14.99
+United Kingdom: 10-18 business days, starting at $19.99
+Australia: 14-21 business days, starting at $22.99
+European Union: 10-16 business days, starting at $17.99
+
+All international orders may be subject to customs duties and import taxes.
+These charges are the responsibility of the customer and are NOT included
+in the shipping price. Acme Corp is not responsible for delays caused by
+customs processing.
+
+===========================================================
+SECTION 5: DELIVERY ISSUES
+===========================================================
+
+Lost Packages:
+If your tracking shows your package has not moved in 5 or more business
+days, contact our support team. We will open a carrier investigation.
+If the package is confirmed lost, Acme Corp will reship the order or
+issue a full refund at no cost to the customer.
+
+Stolen Packages:
+Acme Corp is not responsible for packages confirmed as delivered by the
+carrier. If a delivered package is missing, file a report with local
+authorities and contact your homeowner's or renter's insurance provider.
+As a courtesy, we may offer store credit on a case-by-case basis.
+
+Wrong Address:
+If you provided an incorrect shipping address and the order has already
+shipped, Acme Corp cannot guarantee address changes. Contact support
+immediately and we will attempt to intercept the package, though this
+is not guaranteed. Additional shipping charges may apply for reshipping.
+
+===========================================================
+SECTION 6: BUSINESS HOURS AND CONTACT
+===========================================================
+
+Our customer support team is available:
+Monday to Friday: 9:00 AM to 6:00 PM EST
+Saturday: 10:00 AM to 4:00 PM EST
+Sunday: Closed
+
+Phone: 1-800-ACME-123 (1-800-226-3123)
+Email: support@acmecorp.com
+Live Chat: Available on our website during business hours
