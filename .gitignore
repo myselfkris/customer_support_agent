@@ -14,6 +14,19 @@ venv/
 env/
 .env/
 
+# Runtime logs
+logs/
+
 # IDE files
 .vscode/
 .idea/
+
+# Local databases and caches (recreate with: python -m db.seed)
+*.db
+.pytest_cache/
+
+# Files waiting to be deleted by hand
+_to_delete/
+
+# Editor / agent tool folders
+.agents/
