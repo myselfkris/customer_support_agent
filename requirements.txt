@@ -1,16 +1,35 @@
-# ─── YouTube Reply Agent — Web App Dependencies ───
+# ─── Customer Support Agent — Dependencies ───
 # Install: pip install -r requirements.txt
+
+# Core AI
+google-genai
+langgraph
+
+# RAG + database
+psycopg2-binary
+pgvector
+
+# Relational data (Phase 2)
+sqlalchemy
+alembic
 
 # Backend server
 fastapi
 uvicorn[standard]
 
-# YouTube comment extraction
-google-api-python-client
+# Config & models
+pydantic
+pydantic-settings
+python-dotenv
 
-# Gemini AI analysis
-google-genai
+# Observability
+structlog
 
-# Google Sheets upload
-gspread
-google-auth
+# Auth (Chunk 5)
+PyJWT
+bcrypt
+
+# Testing
+pytest
+pytest-asyncio
+httpx  # required by fastapi.testclient.TestClient
