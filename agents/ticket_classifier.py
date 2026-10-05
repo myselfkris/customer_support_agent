@@ -149,6 +149,10 @@ def create_classifier():
 
 def classify_ticket(client, message: str) -> TicketClassification:
     """Classify a customer support message."""
+    from agents.mock import is_mock_mode, mock_classify_ticket
+    if is_mock_mode():
+        return mock_classify_ticket(message)
+
     import time
     backoff = 15.0
     for attempt in range(5):

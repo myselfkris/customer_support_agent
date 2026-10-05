@@ -1,7 +1,7 @@
 """
 Skill 3 Eval — 20 Q&A test cases
 =================================
-Tracks two things separately (as specified in implementation_plan.md):
+Tracks two things separately (as specified in docs/roadmap.md, Phase 6):
   (1) Retrieval accuracy  — did we find relevant chunks? (retrieval_failed = False)
   (2) Answer accuracy     — did the LLM answer correctly? (keyword check)
 
@@ -20,7 +20,7 @@ import psycopg2
 from pgvector.psycopg2 import register_vector
 from google import genai
 
-from rag_pipeline import query, get_connection, setup_table
+from rag.rag_pipeline import query, get_connection, setup_table
 
 load_dotenv()
 

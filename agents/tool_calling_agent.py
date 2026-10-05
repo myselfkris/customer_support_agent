@@ -21,9 +21,13 @@ from dotenv import load_dotenv
 import os
 import time
 import json
+from datetime import datetime, timezone
 
 
 load_dotenv()  # Load GEMINI_API_KEY from .env file
+
+from db.base import SessionLocal, init_db
+from db.models import Approval, Customer, Order, Refund, Ticket
 
 
 # ============================================================
@@ -33,74 +37,177 @@ load_dotenv()  # Load GEMINI_API_KEY from .env file
 # In production, these would hit a database or API.
 
 def order_lookup(order_id: str) -> dict:
-    """Look up the status of a customer order.
-    
+    """Look up a customer order from the database.
+
     Args:
         order_id: The order ID to look up (e.g., "7291")
-    
+
     Returns:
         Dict with order status information
     """
-    # Simulated database of orders
-    orders = {
-        "7291": {
-            "order_id": "7291",
-            "status": "shipped",
-            "tracking_number": "TRK-998877",
-            "estimated_delivery": "2026-06-09",
-            "items": ["Wireless Mouse", "USB-C Cable"],
-        },
-        "3310": {
-            "order_id": "3310",
-            "status": "delivered",
-            "delivered_date": "2026-06-05",
-            "items": ["Bluetooth Speaker"],
-        },
-        "5592": {
-            "order_id": "5592",
-            "status": "partially_shipped",
-            "shipped_items": ["Laptop Stand"],
-            "pending_items": ["Monitor Arm"],
-            "estimated_delivery": "2026-06-10",
-        },
-        "1234": {
-            "order_id": "1234",
-            "status": "processing",
-            "items": ["Mechanical Keyboard"],
-            "estimated_ship_date": "2026-06-08",
-        },
-    }
-
-    if order_id in orders:
-        return orders[order_id]
-    else:
-        return {"error": f"Order #{order_id} not found in our system."}
+    init_db()
+    session = SessionLocal()
+    try:
+        order = session.get(Order, order_id)
+        if order is None:
+            return {"error": f"Order #{order_id} not found in our system."}
+        return {
+            "order_id": order.id,
+            "customer": order.customer.name,
+            "status": order.status,
+            "tracking_number": order.tracking_number,
+            "items": [item.strip() for item in order.items.split(",") if item.strip()],
+        }
+    finally:
+        session.close()
 
 
-def process_refund(order_id: str, reason: str) -> dict:
-    """Process a refund for a customer order.
-    
+def process_refund(order_id: str, reason: str, requested_by: str = "system") -> dict:
+    """Request a refund against an order (recorded as PENDING, never executed).
+
+    Phase 3: money only moves after an authenticated human approves the request.
+    This function is IDEMPOTENT — calling it twice for the same order returns the
+    SAME pending request instead of creating duplicate refunds.
+
     Args:
         order_id: The order ID to refund
         reason: The reason for the refund
-    
-    Returns:
-        Dict with refund confirmation details
-    """
-    # Simulated refund processing
-    known_orders = ["7291", "3310", "5592", "1234"]
+        requested_by: Who is asking (supplied from the API key in Phase 3)
 
-    if order_id in known_orders:
+    Returns:
+        Dict with refund + approval details
+    """
+    init_db()
+    session = SessionLocal()
+    try:
+        order = session.get(Order, order_id)
+        if order is None:
+            return {"error": f"Cannot process refund: Order #{order_id} not found."}
+
+        # Idempotency guard: one open refund per order. If a pending or already
+        # approved refund exists, return it instead of creating a duplicate.
+        existing = (
+            session.query(Refund)
+            .filter(Refund.order_id == order.id, Refund.status.in_(["pending", "approved"]))
+            .first()
+        )
+        if existing is not None:
+            return {
+                "refund_id": f"REF-{existing.id}",
+                "order_id": order.id,
+                "status": existing.status,
+                "refund_amount": existing.amount,
+                "reason": existing.reason,
+                "already_requested": True,
+            }
+
+        refund = Refund(order_id=order.id, amount=order.amount, reason=reason, status="pending")
+        session.add(refund)
+        session.flush()  # assign refund.id so the approval can reference it
+
+        approval = Approval(
+            kind="refund",
+            order_id=order.id,
+            refund_id=refund.id,
+            amount=order.amount,
+            reason=reason,
+            status="pending",
+            requested_by=requested_by,
+        )
+        session.add(approval)
+        session.commit()
+        session.refresh(refund)
         return {
-            "refund_id": f"REF-{order_id}-001",
-            "order_id": order_id,
-            "status": "approved",
-            "refund_amount": "$49.99",
-            "estimated_refund_date": "2026-06-12",
-            "reason": reason,
+            "refund_id": f"REF-{refund.id}",
+            "approval_id": approval.id,
+            "order_id": order.id,
+            "status": refund.status,
+            "refund_amount": refund.amount,
+            "reason": refund.reason,
+            "already_requested": False,
         }
-    else:
-        return {"error": f"Cannot process refund: Order #{order_id} not found."}
+    finally:
+        session.close()
+
+
+def get_customer_details(customer_id: int) -> dict:
+    """Look up a customer by their numeric ID from the database."""
+    init_db()
+    session = SessionLocal()
+    try:
+        customer = session.get(Customer, customer_id)
+        if customer is None:
+            return {"error": f"Customer #{customer_id} not found."}
+        return {
+            "customer_id": customer.id,
+            "name": customer.name,
+            "email": customer.email,
+        }
+    finally:
+        session.close()
+
+
+def create_support_ticket(customer_id: int, subject: str) -> dict:
+    """Create a support ticket for a customer (recorded in the database)."""
+    init_db()
+    session = SessionLocal()
+    try:
+        customer = session.get(Customer, customer_id)
+        if customer is None:
+            return {"error": f"Customer #{customer_id} not found."}
+        ticket = Ticket(customer_id=customer.id, subject=subject, status="open")
+        session.add(ticket)
+        session.commit()
+        session.refresh(ticket)
+        return {
+            "ticket_id": ticket.id,
+            "customer_id": ticket.customer_id,
+            "subject": ticket.subject,
+            "status": ticket.status,
+        }
+    finally:
+        session.close()
+
+
+def cancel_order(order_id: str, requested_by: str = "system") -> dict:
+    """Request an order cancellation (recorded as PENDING, never executed).
+
+    Phase 3: the order moves to ``pending_cancel``; it only becomes ``cancelled``
+    after a human approves the request. Idempotent — repeat calls return the
+    current pending state instead of re-requesting.
+    """
+    init_db()
+    session = SessionLocal()
+    try:
+        order = session.get(Order, order_id)
+        if order is None:
+            return {"error": f"Cannot cancel: Order #{order_id} not found."}
+
+        # Idempotency guard: a cancellation already requested or done — just report it.
+        if order.status in ("pending_cancel", "cancelled"):
+            return {"order_id": order.id, "status": order.status, "already_requested": True}
+
+        previous = order.status
+        order.status = "pending_cancel"
+        approval = Approval(
+            kind="cancel",
+            order_id=order.id,
+            previous_status=previous,
+            amount=0.0,
+            reason="Customer requested order cancellation.",
+            status="pending",
+            requested_by=requested_by,
+        )
+        session.add(approval)
+        session.commit()
+        return {
+            "order_id": order.id,
+            "status": order.status,
+            "approval_id": approval.id,
+            "already_requested": False,
+        }
+    finally:
+        session.close()
 
 
 def escalate_to_human(reason: str, urgency: str) -> dict:
@@ -120,6 +227,114 @@ def escalate_to_human(reason: str, urgency: str) -> dict:
         "reason": reason,
         "estimated_wait_time": "3 minutes" if urgency in ["high", "critical"] else "10 minutes",
     }
+
+
+def approve_approval(approval_id: int, approved_by: str) -> dict:
+    """Approve a pending approval and apply its effect EXACTLY ONCE.
+
+    Admin-only (Phase 3). This function is deliberately NOT registered in
+    ``TOOL_FUNCTIONS`` or the Gemini ``tools`` list, so the customer-facing LLM
+    can NEVER call it — the agent can request money, but it cannot approve it.
+    """
+    init_db()
+    session = SessionLocal()
+    try:
+        approval = session.get(Approval, approval_id)
+        if approval is None:
+            return {"error": f"Approval #{approval_id} not found."}
+
+        # Transition guard: only a pending approval can be decided.
+        if approval.status != "pending":
+            return {"error": f"Approval #{approval_id} already {approval.status}.", "status": approval.status}
+
+        now = datetime.now(timezone.utc)
+        if approval.kind == "refund":
+            refund = session.get(Refund, approval.refund_id)
+            if refund is None:
+                return {"error": f"Refund for approval #{approval_id} not found."}
+            refund.status = "approved"
+            refund.approved_by = approved_by
+            refund.approved_at = now
+        elif approval.kind == "cancel":
+            order = session.get(Order, approval.order_id)
+            if order is not None:
+                order.status = "cancelled"
+        else:
+            return {"error": f"Unknown approval kind: {approval.kind}"}
+
+        approval.status = "approved"
+        approval.approved_by = approved_by
+        approval.resolved_at = now
+        session.commit()
+        return {
+            "approval_id": approval.id,
+            "kind": approval.kind,
+            "status": approval.status,
+            "order_id": approval.order_id,
+        }
+    finally:
+        session.close()
+
+
+def decline_approval(approval_id: int, declined_by: str) -> dict:
+    """Decline a pending approval and revert/close the pending request."""
+    init_db()
+    session = SessionLocal()
+    try:
+        approval = session.get(Approval, approval_id)
+        if approval is None:
+            return {"error": f"Approval #{approval_id} not found."}
+        if approval.status != "pending":
+            return {"error": f"Approval #{approval_id} already {approval.status}.", "status": approval.status}
+
+        now = datetime.now(timezone.utc)
+        if approval.kind == "refund":
+            refund = session.get(Refund, approval.refund_id)
+            if refund is not None:
+                refund.status = "declined"
+        elif approval.kind == "cancel":
+            order = session.get(Order, approval.order_id)
+            if order is not None:
+                # Restore the order to the status it had before the cancel request.
+                order.status = approval.previous_status or "processing"
+        else:
+            return {"error": f"Unknown approval kind: {approval.kind}"}
+
+        approval.status = "declined"
+        approval.approved_by = declined_by
+        approval.resolved_at = now
+        session.commit()
+        return {
+            "approval_id": approval.id,
+            "kind": approval.kind,
+            "status": approval.status,
+            "order_id": approval.order_id,
+        }
+    finally:
+        session.close()
+
+
+def list_pending_approvals() -> list[dict]:
+    """List every approval still waiting for a human decision."""
+    init_db()
+    session = SessionLocal()
+    try:
+        approvals = session.query(Approval).filter(Approval.status == "pending").all()
+        return [
+            {
+                "approval_id": a.id,
+                "kind": a.kind,
+                "order_id": a.order_id,
+                "amount": a.amount,
+                "reason": a.reason,
+                "status": a.status,
+                "requested_by": a.requested_by,
+                "created_at": a.created_at.isoformat() if a.created_at else None,
+            }
+            for a in approvals
+        ]
+    finally:
+        session.close()
 
 
 # ============================================================
@@ -198,11 +413,51 @@ escalate_to_human_declaration = types.FunctionDeclaration(
 
 
 # Bundle all tool declarations into a Tool object
+get_customer_details_declaration = types.FunctionDeclaration(
+    name="get_customer_details",
+    description="Look up a customer by their numeric customer ID. Use when the customer asks about their account or personal details.",
+    parameters=types.Schema(
+        type=types.Type.OBJECT,
+        properties={
+            "customer_id": types.Schema(type=types.Type.INTEGER, description="The numeric customer ID"),
+        },
+        required=["customer_id"],
+    ),
+)
+
+create_support_ticket_declaration = types.FunctionDeclaration(
+    name="create_support_ticket",
+    description="Create a support ticket for a customer. Use when an issue needs to be tracked or followed up.",
+    parameters=types.Schema(
+        type=types.Type.OBJECT,
+        properties={
+            "customer_id": types.Schema(type=types.Type.INTEGER, description="The numeric customer ID"),
+            "subject": types.Schema(type=types.Type.STRING, description="Short description of the issue"),
+        },
+        required=["customer_id", "subject"],
+    ),
+)
+
+cancel_order_declaration = types.FunctionDeclaration(
+    name="cancel_order",
+    description="Cancel an order. Use when the customer explicitly asks to cancel an order they placed.",
+    parameters=types.Schema(
+        type=types.Type.OBJECT,
+        properties={
+            "order_id": types.Schema(type=types.Type.STRING, description="The order ID to cancel"),
+        },
+        required=["order_id"],
+    ),
+)
+
 tools = types.Tool(
     function_declarations=[
         order_lookup_declaration,
         process_refund_declaration,
         escalate_to_human_declaration,
+        get_customer_details_declaration,
+        create_support_ticket_declaration,
+        cancel_order_declaration,
     ]
 )
 
@@ -212,12 +467,15 @@ tools = types.Tool(
 # ============================================================
 
 SYSTEM_PROMPT = """
-You are a customer support agent. You can look up orders, process refunds, 
-and escalate issues to human agents.
+You are a customer support agent. You can look up orders, process refunds,
+look up customers, create support tickets, cancel orders, and escalate issues to human agents.
 
 TOOL SELECTION RULES — When to use each tool:
 - Use order_lookup when customer asks about order status AND provides an order number.
 - Use process_refund when customer explicitly requests a refund AND provides an order number.
+- Use get_customer_details when the customer asks about their account or personal details.
+- Use create_support_ticket when an issue needs to be tracked or followed up.
+- Use cancel_order when the customer explicitly asks to cancel an order.
 - Use escalate_to_human when customer is extremely upset, makes legal threats, or asks for a human.
 - Use escalate_to_human when customer has a mixture of queries which cannot be handled by tools.
 
@@ -262,6 +520,9 @@ TOOL_FUNCTIONS = {
     "order_lookup": order_lookup,
     "process_refund": process_refund,
     "escalate_to_human": escalate_to_human,
+    "get_customer_details": get_customer_details,
+    "create_support_ticket": create_support_ticket,
+    "cancel_order": cancel_order,
 }
 
 
@@ -302,6 +563,9 @@ def run_agent(client, user_message: str) -> dict:
         - tool_result: dict or None (result from tool execution)
         - final_response: str (the agent's final text response)
     """
+    from agents.mock import is_mock_mode, mock_run_agent
+    if is_mock_mode():
+        return mock_run_agent(user_message)
 
     MODEL = "gemini-2.5-flash"
 

@@ -28,12 +28,12 @@ from langgraph.graph import StateGraph, START, END
 from typing_extensions import TypedDict
 
 # ── Import our Skills ────────────────────────────────────────────────────────
-from ticket_classifier import create_classifier, classify_ticket
-from tool_calling_agent import create_agent, run_agent, escalate_to_human
+from agents.ticket_classifier import create_classifier, classify_ticket
+from agents.tool_calling_agent import create_agent, run_agent, escalate_to_human
 
 # ── RAG (optional) ───────────────────────────────────────────────────────────
 try:
-    from rag_pipeline import get_connection, setup_table, query as rag_query
+    from rag.rag_pipeline import get_connection, setup_table, query as rag_query
     RAG_AVAILABLE = True
 except ImportError:
     RAG_AVAILABLE = False
@@ -260,7 +260,7 @@ def direct_node(state: AgentState) -> dict:
     print(f"  [NODE: direct] Direct LLM response (no tools, no RAG)...")
 
     response = genai_client.models.generate_content(
-        model="gemini-2.0-flash-thinking-exp",
+        model="gemini-2.5-flash",
         contents=state["user_message"],
         config=types.GenerateContentConfig(
             system_instruction=DIRECT_RESPONSE_PROMPT,

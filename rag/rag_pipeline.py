@@ -17,7 +17,7 @@ import re
 import json
 import argparse
 import time
-from pathlib import Path
+from pathlib import Path    
 from typing import Optional
 
 import psycopg2
@@ -505,6 +505,10 @@ def query(client: genai.Client, conn, question: str, verbose: bool = True) -> RA
 
     Returns a RAGResponse Pydantic object.
     """
+    from agents.mock import is_mock_mode, mock_rag_query
+    if is_mock_mode():
+        return mock_rag_query(question)
+
     if verbose:
         print(f"\n[QUERY] '{question}'")
 

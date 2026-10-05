@@ -22,7 +22,7 @@ customer_support_agent/
 ├── docs/
 │   ├── rag_deep_dive.md         # Deep dive notes on RAG concepts
 │   ├── evaluation_results.md    # RAG evaluation results
-│   └── implementation_plan.md   # Project implementation plan
+│   └── roadmap.md              # Production roadmap
 ├── .env.example
 ├── requirements.txt
 └── README.md
@@ -41,7 +41,8 @@ Classifies incoming customer support messages into structured output using Gemin
 - **Outputs**: `requires_tool` (bool), `confidence` (float), `reasoning` (str)
 
 ```bash
-python agents/ticket_classifier.py
+# From the repo root
+python -m agents.ticket_classifier
 ```
 
 ---
@@ -50,7 +51,7 @@ python agents/ticket_classifier.py
 An agent that calls real tools (order lookup, refund processing, etc.) based on the classified intent. Demonstrates function calling with Gemini.
 
 ```bash
-python agents/tool_calling_agent.py
+python -m agents.tool_calling_agent
 ```
 
 ---
@@ -64,16 +65,16 @@ Full **Retrieval-Augmented Generation** pipeline backed by **PostgreSQL + pgvect
 
 ```bash
 # Index all documents in sample_docs/
-python rag/rag_pipeline.py --index
+python -m rag.rag_pipeline --index
 
 # Ask a question
-python rag/rag_pipeline.py --query "What is the return window?"
+python -m rag.rag_pipeline --query "What is the return window?"
 
 # Reset and re-index from scratch
-python rag/rag_pipeline.py --reset
+python -m rag.rag_pipeline --reset
 
 # Show indexing stats
-python rag/rag_pipeline.py --stats
+python -m rag.rag_pipeline --stats
 ```
 
 **Config defaults:**
@@ -92,7 +93,7 @@ python rag/rag_pipeline.py --stats
 A hand-rolled **ReAct (Reason + Act)** agent loop built without any framework — pure Python. Demonstrates how agents think step by step before acting.
 
 ```bash
-python agents/manual_agent_loop.py
+python -m agents.manual_agent_loop
 ```
 
 ---
@@ -102,11 +103,26 @@ A production-grade multi-step agent built with **LangGraph** — handles complex
 
 ```bash
 # Interactive mode
-python agents/langgraph_agent.py
+python -m agents.langgraph_agent
 
 # Evaluation mode (runs test suite)
-python agents/langgraph_agent.py --eval
+python -m agents.langgraph_agent --eval
 ```
+
+---
+
+### Skill 6 - Reliability + Memory (`agents/reliable_agent.py`)
+Wraps the LangGraph agent with production safety basics: input validation, prompt-injection refusal, per-user short-term memory, per-user rate limiting, retry logic, graceful fallback responses, and JSONL structured logs.
+
+```bash
+# Interactive reliable agent
+python -m agents.reliable_agent
+
+# Offline failure-injection eval
+python -m agents.reliable_agent --eval
+```
+
+Logs are written to `logs/skill6_agent_events.jsonl`.
 
 ---
 
@@ -117,7 +133,7 @@ Runs **20 structured test cases** across the RAG pipeline:
 - 5 out-of-scope questions (tests graceful fallback)
 
 ```bash
-python rag/rag_eval.py
+python -m rag.rag_eval
 ```
 
 ---
@@ -145,7 +161,13 @@ cp .env.example .env
 ```env
 GEMINI_API_KEY=your_gemini_api_key_here
 DATABASE_URL=postgresql://postgres:password@localhost:5432/customer_support
+# Optional: run fully offline with keyword-rule mocks (no API calls)
+MOCK_MODE=false
 ```
+
+> **Run without an API key (mock mode):** set `MOCK_MODE=true` and the agent,
+> classifier, tool-calling loop, and RAG query all use fast offline mocks instead of
+> calling Gemini. Great for development and tests — no cost, no rate limits.
 
 ### 4. Set up PostgreSQL (for RAG pipeline)
 Make sure PostgreSQL is running with the `pgvector` extension available:
@@ -156,7 +178,25 @@ CREATE DATABASE customer_support;
 
 ---
 
-## 🛠️ Tech Stack
+## 🔌 REST API (FastAPI)
+
+```bash
+uvicorn app.main:app --reload
+```
+
+| Method | Path | Body | Returns |
+|---|---|---|---|
+| `GET` | `/health` | — | Service, mock-mode, and configuration status |
+| `POST` | `/chat` | `{"user_id": "...", "message": "..."}` | `{"user_id": "...", "response": "..."}` |
+
+Interactive docs: http://localhost:8000/docs
+
+> With `MOCK_MODE=true`, the API runs fully offline (no API key needed).
+
+---
+
+
+## �🛠️ Tech Stack
 
 | Component | Technology |
 |---|---|
@@ -177,7 +217,11 @@ langgraph
 psycopg2-binary
 pgvector
 pydantic
+pydantic-settings
 python-dotenv
+fastapi
+uvicorn[standard]
+structlog
 ```
 
 Install all:

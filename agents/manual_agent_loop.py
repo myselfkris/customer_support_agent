@@ -39,15 +39,15 @@ from google.genai import types
 
 # ── Import our Skills ───────────────────────────────────────────────────────
 # Skill 1: Classifier
-from ticket_classifier import create_classifier, classify_ticket, TicketClassification
+from agents.ticket_classifier import create_classifier, classify_ticket, TicketClassification
 
 # Skill 2: Tool calling agent
-from tool_calling_agent import create_agent, run_agent
+from agents.tool_calling_agent import create_agent, run_agent
 
 # Skill 3: RAG pipeline (optional — needs PostgreSQL)
 try:
     import psycopg2
-    from rag_pipeline import get_connection, setup_table, query as rag_query, embed_query, retrieve_chunks, build_rag_prompt, generate_answer, RAG_SYSTEM_PROMPT
+    from rag.rag_pipeline import get_connection, setup_table, query as rag_query, embed_query, retrieve_chunks, build_rag_prompt, generate_answer, RAG_SYSTEM_PROMPT
     RAG_AVAILABLE = True
 except ImportError:
     RAG_AVAILABLE = False
