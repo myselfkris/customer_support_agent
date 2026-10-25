@@ -2,6 +2,38 @@
 
 A modular AI-powered customer support system built with **Google Gemini** and **LangGraph**, progressing from a simple ticket classifier to a full RAG-powered agent pipeline.
 
+I spent 7 months working in customer support. This project automates the repetitive parts of that job (order lookups, refunds, policy questions) and hands angry or critical cases to a human.
+
+**Highlights:** LangGraph routing (tool / RAG / escalate / direct) · RAG on PostgreSQL + pgvector · Gemini tool calling · human escalation and approval workflow · prompt-injection refusal, rate limits, retries and fallbacks · FastAPI with API-key auth · offline `MOCK_MODE`
+
+---
+
+## ✅ Results
+
+LangGraph agent eval run (full details in [`docs/evaluation_results.md`](docs/evaluation_results.md)):
+
+| Metric | Result | Target |
+| :--- | :--- | :--- |
+| Route selection accuracy | **5/5 (100%)** | 85%+ |
+| Tool selection accuracy | **3/3 (100%)** | 85%+ |
+
+The RAG pipeline also has a separate 20-case eval suite (`python -m rag.rag_eval`).
+
+## 💬 Sample Run
+
+```text
+User:   I WANT TO SPEAK TO A MANAGER RIGHT NOW!!!
+        → intent: complaint | urgency: critical | route: escalate
+Agent:  I'm connecting you with a human agent right away.
+        Your case ID is ESC-20260607-001. Estimated wait: 3 minutes.
+
+User:   I want a refund for order #3310. It arrived broken.
+        → intent: refund_request | urgency: high | route: tool
+        → process_refund(order_id='3310', reason='It arrived broken.')
+Agent:  Your refund for order #3310 has been approved due to the item arriving broken.
+        A refund of $49.99 will be processed by June 12, 2026.
+```
+
 ---
 
 ## 📁 Project Structure
